@@ -193,8 +193,7 @@ class TestCreatingNote(NotedownTestCase):
                             load_settings):
         self.create_note('Foo')
         self.assertFalse(self.note_exists('Foo.md'))
-        message = 'Could not create {}:\n\nboom'.format(
-            os.path.join(self.notes_dir, 'Foo.md'))
+        message = f"Could not create {os.path.join(self.notes_dir, 'Foo.md')}:\n\nboom"
         error_message.assert_called_once_with(message)
 
 
