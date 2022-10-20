@@ -52,7 +52,7 @@ class NotedownOpenCommand(_NotedownTextCommand):
 
     def run(self, edit):
         self._notes = _find_notes_for_view(self.view)
-        _debug_log('num notes: {}'.format(len(self._notes)))
+        _debug_log(f'num notes: {len(self._notes)}')
         self._link_regions = _find_link_regions(self.view)
         for selection in self.view.sel():
             if selection.empty():
@@ -63,10 +63,8 @@ class NotedownOpenCommand(_NotedownTextCommand):
     def _open_point(self, point):
         if self.view.match_selector(point, _URL_SELECTOR):
             webbrowser.open(self.view.substr(self.view.extract_scope(point)))
-        else:
-            title = self._title_at_point(point)
-            if title:
-                self._open_note(title)
+        elif title := self._title_at_point(point):
+            self._open_note(title)
 
     def _open_selection(self, text):
         self._open_note(text)
@@ -145,7 +143,7 @@ class NotedownLintCommand(_NotedownTextCommand):
         description, region, _ = error
         row, _ = self.view.rowcol(region.begin())
         text = self.view.substr(region)
-        return [description, 'Line {}: {}'.format(row + 1, text)]
+        return [description, f'Line {row + 1}: {text}']
 
 
 class NotedownLinkCommand(_NotedownTextCommand):
@@ -177,7 +175,7 @@ class NotedownPlaceLinkCommand(_NotedownTextCommand):
 
     def run(self, edit, title):
         selection = self.view.sel()
-        text = '[[{}]]'.format(title)
+        text = f'[[{title}]]'
         for region in selection:
             self.view.replace(edit, region, text)
         regions = [sublime.Region(r.end(), r.end()) for r in selection]
@@ -198,11 +196,12 @@ class NotedownEventListener(sublime_plugin.EventListener):
         if not _viewing_a_note(view):
             return
 
-        reflect_title_in_filename = _setting('reflect_title_in_filename', bool)
-        renamed = False
-        if reflect_title_in_filename:
+        if reflect_title_in_filename := _setting(
+            'reflect_title_in_filename', bool
+        ):
             renamed = self._reflect_title_in_filename(view)
-
+        else:
+            renamed = False
         if not renamed:
             view.run_command('notedown_lint')
 
@@ -221,7 +220,7 @@ class NotedownEventListener(sublime_plugin.EventListener):
         new_filename = os.path.join(os.path.dirname(old_filename),
                                     new_basename)
 
-        text = 'Rename this file to {}?'.format(new_basename)
+        text = f'Rename this file to {new_basename}?'
         if not sublime.ok_cancel_dialog(text, 'Rename File'):
             return False
 
@@ -232,8 +231,7 @@ class NotedownEventListener(sublime_plugin.EventListener):
         try:
             os.rename(old_filename, new_filename)
         except OSError as exp:
-            sublime.error_message('Could not rename {}:\n\n{}'
-                                  .format(old_filename, exp))
+            sublime.error_message(f'Could not rename {old_filename}:\n\n{exp}')
             return False
 
         view = window.open_file(new_filename)
@@ -242,8 +240,7 @@ class NotedownEventListener(sublime_plugin.EventListener):
 
         updated = self._update_backlinks(old_name, new_name, encoding,
                                          os.path.dirname(new_filename))
-        view.window().status_message('Updated backlinks to {} note(s)'
-                                     .format(updated))
+        view.window().status_message(f'Updated backlinks to {updated} note(s)')
 
         return True
 
@@ -262,11 +259,9 @@ class NotedownEventListener(sublime_plugin.EventListener):
         if not removed:
             return  # Nothing to do
 
-        pattern = re.compile(r'\[\[({})\]\]'.format('|'.join(removed)),
-                             re.IGNORECASE)
-        repl = '[[{}]]'.format(next(_titles(new_name)))
-        _debug_log('updating back links: {} -> {}'.format('|'.join(removed),
-                                                          new_name))
+        pattern = re.compile(f"\[\[({'|'.join(removed)})\]\]", re.IGNORECASE)
+        repl = f'[[{next(_titles(new_name))}]]'
+        _debug_log(f"updating back links: {'|'.join(removed)} -> {new_name}")
 
         updated = 0
         filenames = {os.path.join(notes_dir, filename)
@@ -277,13 +272,12 @@ class NotedownEventListener(sublime_plugin.EventListener):
                 try:
                     text, count = pattern.subn(repl, fileobj.read())
                 except UnicodeEncodeError:
-                    _log('{} is not {} encoded'.format(filename, encoding))
+                    _log(f'{filename} is not {encoding} encoded')
                     continue
 
             if count:
                 updated += 1
-                _debug_log('updating {} back link(s) in {}'
-                           .format(count, filename))
+                _debug_log(f'updating {count} back link(s) in {filename}')
                 with open(filename, 'w', encoding=encoding) as fileobj:
                     fileobj.write(text)
 
@@ -297,9 +291,11 @@ def debug(enable=True):
 
 def _note_title(view):
     """Returns the title of the note in view or None if there is no title."""
-    if not view.match_selector(0, 'markup.heading.1.markdown'):
-        return None
-    return view.substr(view.line(0))[2:].strip()
+    return (
+        view.substr(view.line(0))[2:].strip()
+        if view.match_selector(0, 'markup.heading.1.markdown')
+        else None
+    )
 
 
 def _find_notes_for_view(view):
@@ -341,8 +337,8 @@ def _create_note(title, view):
     there was an error.
     """
     ext = _setting('markdown_extension', str, _DEFAULT_EXTENSION)
-    filename = '{}.{}'.format(title, ext)
-    text = 'Create a new note "{}"?'.format(filename)
+    filename = f'{title}.{ext}'
+    text = f'Create a new note "{filename}"?'
     if not sublime.ok_cancel_dialog(text, 'Create Note'):
         return
     filename = _full_path(view, filename)
@@ -354,8 +350,7 @@ def _create_note(title, view):
         with open(filename, 'w') as fileobj:
             fileobj.write(_NOTE_TEMPLATE.format(title, back_title))
     except IOError as exp:
-        sublime.error_message('Could not create {}:\n\n{}'
-                              .format(filename, exp))
+        sublime.error_message(f'Could not create {filename}:\n\n{exp}')
         return
 
     return filename
@@ -428,7 +423,7 @@ def _debug_log(message):
 
 
 def _log(message):
-    sys.stdout.write('Notedown: {}\n'.format(message))
+    sys.stdout.write(f'Notedown: {message}\n')
     sys.stdout.flush()
 
 

@@ -9,6 +9,6 @@ if isdir(dest_path):
     print('Removing existing Notedown installation')
     rmtree(dest_path)
 
-print('Installing Notedown to {}'.format(dest_path))
+print(f'Installing Notedown to {dest_path}')
 copytree(abspath(join(dirname(__file__), os.pardir)), dest_path,
          ignore=ignore_patterns('.git', '__pycache__'))
